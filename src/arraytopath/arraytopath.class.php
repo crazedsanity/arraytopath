@@ -365,31 +365,19 @@ class ArrayToPath {
 		}
 		
 		//If we have anything left, we'll need to do some crazy while() looping madness.
-		$i=0;
 		if(is_array($tracerData) && count($tracerData)) {
 			while($myData = array_shift($tracerData)) {
-				
-				if(is_array($myData) && count($myData) == 2 && isset($myData['path'])) {
-					if(is_array($myData['data']) && count($myData['data'])) {
-						$basePath = $myData['path'];
-						foreach($myData['data'] as $key=>$val) {
-							$tracerData[] = array(
-								'path'	=> $basePath .'/'. $key,
-								'data'	=> $val
-							);
-						}
-					}
-					else {
-						$this->validPaths[] = $myData['path'];
+				if(is_array($myData['data']) && count($myData['data'])) {
+					$basePath = $myData['path'];
+					foreach($myData['data'] as $key=>$val) {
+						$tracerData[] = array(
+							'path'	=> $basePath .'/'. $key,
+							'data'	=> $val
+						);
 					}
 				}
 				else {
-					throw new exception(__METHOD__ .": invalid data or missing path");
-				}
-				
-				$i++;
-				if($i >= 5000) {
-					exit(__METHOD__ .": too many loops");
+					$this->validPaths[] = $myData['path'];
 				}
 			}
 		}
