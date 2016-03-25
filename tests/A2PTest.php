@@ -6,20 +6,13 @@
 use crazedsanity\arraytopath\ArrayToPath;
 use crazedsanity\core\ToolBox;
 
-class ArrayToPathTest extends PHPUnit_Framework_TestCase {
+class TestOfArrayToPath extends PHPUnit_Framework_TestCase {
 	
 	//-------------------------------------------------------------------------
 	function setUp() {
 		$this->a2p = new arraytopath(array());
 		$this->gfObj = new ToolBox();
 	}//end setUp()
-	//-------------------------------------------------------------------------
-	
-	
-	
-	//-------------------------------------------------------------------------
-	function tearDown() {
-	}//end tearDown()
 	//-------------------------------------------------------------------------
 	
 	
@@ -237,6 +230,238 @@ class ArrayToPathTest extends PHPUnit_Framework_TestCase {
 		
 	}//end test_path_tracer()
 	//-------------------------------------------------------------------------
+	
+	
+	//-------------------------------------------------------------------------
+	function test_pathWithDots() {
+		$data = array(
+			'x'	=> array(
+				'y'	=> array(
+					'z'	=> __METHOD__
+				)
+			)
+		);
+		
+		$a2p = new ArrayToPath($data);
+		$this->assertEquals(__METHOD__, $a2p->get_data('/x/y/z'));
+		$this->assertEquals(__METHOD__, $a2p->get_data('/x/./y/z'));
+		$this->assertEquals(__METHOD__, $a2p->get_data('/x/../x/y/z'));
+		$this->assertEquals(__METHOD__, $a2p->get_data('/x/.././../../x/y/z'));
+	}
+	//-------------------------------------------------------------------------
+	
+	
+	//-------------------------------------------------------------------------
+	function test_badLastIndex() {
+		$data = array(
+			'test'	=> array(
+				'one'	=> array(
+					'two'	=> array(
+						
+					)
+				)
+			)
+		);
+		$a2p = new ArrayToPath($data);
+		$a2p->get_data('/test/one/two/three/four');
+	}
+	//-------------------------------------------------------------------------
+	
+	
+	
+	//-------------------------------------------------------------------------
+	function test_createWithoutArray() {
+		$a2p = new ArrayToPath();
+		$this->assertEquals(array(), $a2p->get_data('/'));
+	}
+	//-------------------------------------------------------------------------
+	
+	
+	
+	//-------------------------------------------------------------------------
+	function test_set_data() {
+		$a2p = new ArrayToPath();
+		$this->assertEquals(1, $a2p->set_data('/path/to/somewhere/good', __METHOD__));
+		$this->assertEquals(__METHOD__, $a2p->get_data('/path/to/somewhere/good'));
+		
+		$this->assertEquals(1, $a2p->set_data('/', __METHOD__));
+		$this->assertEquals(__METHOD__, $a2p->get_data('/'));
+		
+		$this->assertEquals(1, $a2p->set_data('/test', __METHOD__));
+		$this->assertEquals(__METHOD__, $a2p->get_data('/test'));
+	}
+	//-------------------------------------------------------------------------
+	
+	
+	//-------------------------------------------------------------------------
+	/**
+	 * @expectedException InvalidArgumentException
+	 */
+	function test_setObject_rootlevel() {
+		$a2p = new ArrayToPath();
+		$a2p->set_data('/', new stdClass());
+	}
+	//-------------------------------------------------------------------------
+	
+	
+	//-------------------------------------------------------------------------
+	/**
+	 * @expectedException InvalidArgumentException
+	 */
+	function test_setObject_oneDeep() {
+		$a2p = new ArrayToPath();
+		$a2p->set_data('/one', new stdClass());
+	}
+	//-------------------------------------------------------------------------
+	
+	
+	//-------------------------------------------------------------------------
+	/**
+	 * @expectedException InvalidArgumentException
+	 */
+	function test_setObject_twoDeep() {
+		$a2p = new ArrayToPath();
+		$a2p->set_data('/one/two', new stdClass());
+	}
+	//-------------------------------------------------------------------------
+	
+	
+	
+	
+	//-------------------------------------------------------------------------
+	/**
+	 * @expectedException InvalidArgumentException
+	 */
+	function test_objectSupport() {
+		$myData = array(
+			'one'	=> new stdClass(),
+		);
+		$myData['one']->two = "three";
+		$a2p = new ArrayToPath($myData);
+		$a2p->get_data('/one/two/three');
+	}
+	//-------------------------------------------------------------------------
+	
+	
+	
+	//-------------------------------------------------------------------------
+	function test_fix_path() {
+		$a2p = new ArrayToPath();
+		$thePath = '//one///////../one/./_two-/.//';
+		$this->assertEquals('/one/_two-', ArrayToPath::fix_path($thePath));
+		
+		$newPath = 'fake/../real/one/two/three';
+		$this->assertEquals('/real/one/two/three', ArrayToPath::fix_path($newPath));
+	}
+	//-------------------------------------------------------------------------
+	
+	
+	//-------------------------------------------------------------------------
+	function test_invalid_path() {
+		$a2p = new ArrayToPath();
+		
+		$this->assertEquals(null, $a2p->get_data('/this/does/not/exist'));
+	}
+	//-------------------------------------------------------------------------
+	
+	
+	
+	
+	//-------------------------------------------------------------------------
+	function test_get_valid_paths() {
+		$empty = new ArrayToPath();
+		$this->assertEquals(array(), $empty->get_valid_paths());
+		
+		$data = array(
+			'test' => array(
+				'one' => array(
+					'two' => array(
+						'three' => array(
+							
+						),
+						'another' => array(
+							
+						)
+					)
+				),
+				'here'	=> array(),
+			)
+		);
+		$matchThis = array(
+			'/test/here',
+			'/test/one/two/three',
+			'/test/one/two/another',
+		);
+		$a2p = new ArrayToPath($data);
+		$this->assertEquals($matchThis, $a2p->get_valid_paths());
+	}
+	//-------------------------------------------------------------------------
+	
+	
+	
+	//-------------------------------------------------------------------------
+	/**
+	 * @expectedException Exception
+	 */
+	function test_unset_data_not_array_exception() {
+		$data = array(
+			'one'	=> array(),
+			'two'	=> array(),
+			'three'	=> __METHOD__
+		);
+		$a2p = new ArrayToPath();
+		$a2p->unset_data('/three/'. __METHOD__);
+	}
+	//-------------------------------------------------------------------------
+	
+	
+	
+	//-------------------------------------------------------------------------
+	function test_unset_data() {
+		$data = array(
+			'one'	=> array(),
+			'two'	=> array(),
+			'three'	=> __METHOD__
+		);
+		$a2p = new ArrayToPath($data);
+		$this->assertEquals($data, $a2p->get_data());
+		
+		$this->assertEquals(1, $a2p->unset_data('/three'));
+		$this->assertNotEquals($data, $a2p->get_data());
+		unset($data['three']);
+		$this->assertEquals($data, $a2p->get_data());
+	}
+	//-------------------------------------------------------------------------
+	
+	
+	
+	//-------------------------------------------------------------------------
+	function test_set_value_beneath_text_value() {
+		
+		$data = array(
+			'one'	=> array(),
+			'two'	=> array(),
+			'three'	=> __METHOD__
+		);
+		$a2p = new ArrayToPath($data);
+		
+		$this->assertEquals($data, $a2p->get_data());
+		
+		$data['three'] = array(
+			__METHOD__ => "new"
+		);
+		$this->assertEquals(1, $a2p->set_data('/three/'. __METHOD__, "new"));
+		$this->assertEquals($data, $a2p->get_data());
+		
+		$data['three'][__METHOD__] = array(
+			'new'	=> 'again'
+		);
+		$this->assertEquals(1, $a2p->set_data('/three/'. __METHOD__ ."/new", 'again'));
+		$this->assertEquals($data, $a2p->get_data());
+		$this->assertEquals($data['three'][__METHOD__]['new'], $a2p->get_data('/three/'. __METHOD__ .'/new'));
+	}
+	//-------------------------------------------------------------------------
+	
 	
 }//end testOfA2P{}
 

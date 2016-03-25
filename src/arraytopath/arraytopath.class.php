@@ -33,6 +33,9 @@
  */ 	
 
 namespace crazedsanity\arraytopath;
+use \Exception;
+use \InvalidArgumentException;
+use crazedsanity\core\ToolBox;
 
 class ArrayToPath {
 	
@@ -50,17 +53,11 @@ class ArrayToPath {
 	 * TODO::: there is a strange recursion issue when $prefix is non-null: prefix is presently hardwired as NULL for now... 
 	 */
 	public function __construct($array=null) {
-		if($array === 'unit_test') {
-			//it's a unit test.
-			$this->isTest = TRUE;
+		if(is_array($array)) {
+			$this->data = $array;
 		}
 		else {
-			if(is_array($array)) {
-				$this->data = $array;
-			}
-			else {
-				$this->data = array();
-			}
+			$this->data = array();
 		}
 	}//end __construct()
 	//======================================================================================
@@ -123,8 +120,7 @@ class ArrayToPath {
 			}
 		}
 		elseif(is_object($fromThis)) {
-			//it's an object.
-			$retval = $fromThis->$indexName;
+			throw new InvalidArgumentException("objects are not supported");
 		}
 		return($retval);
 	}//end get_data_segment()
@@ -140,50 +136,8 @@ class ArrayToPath {
 	 * 
 	 * @return <str>	PASS: this is the fixed path
 	 */
-	protected function fix_path($path) {
-		$retval = $path;
-		if(!is_null($path) && strlen($path)) {
-			
-			$retval = preg_replace('/[\/]{2,}/', '/', $retval);
-			if(strlen($retval) && preg_match('/\./', $retval)) {
-				
-				$pieces = explode('/', $retval);
-				
-				$finalPieces = array();
-				for($i=0; $i < count($pieces); $i++) {
-					$dirName = $pieces[$i];
-					if($dirName == '.') {
-						//do nothing; don't bother appending.
-					}
-					elseif($dirName == '..') {
-						$rippedIndex = array_pop($finalPieces);
-					}
-					else {
-						$finalPieces[] = $dirName;
-					}
-				}
-				
-				#$retval = $this->gf->string_from_array($finalPieces, NULL, '/');
-				$retval = "";
-				foreach($finalPieces as $bit) {
-					if(strlen($retval)) {
-						$retval .= '/'. $bit;
-					}
-					else {
-						$retval = '/'. $bit;
-					}
-				}
-			}
-			
-			//remove slashes at the beginning or end of the path.
-			$retval = preg_replace('/\/$/', '', $retval);
-			
-			//remove a trailing slash, if present, before returning.
-			$retval = preg_replace('/\/$/', '', $retval);
-			
-			//turn multiple slashes into a single.
-			$retval = preg_replace('/\/{2,}/', '/', $retval);
-		}
+	public static function fix_path($path) {
+		$retval = preg_replace('~/$~', '', ToolBox::resolve_path_with_dots('/'. $path));
 		
 		return($retval);
 		
@@ -204,25 +158,33 @@ class ArrayToPath {
 	 * @return 1				PASS: everything lines-up.
 	 */
 	public function set_data($path, $data) {
-		//get the list of indices in the session that we have to traverse.
-		$myIndexList = $this->explode_path($path);
-		
-		$retval = 0;
-		//Use an internal iterator to go through the little bits of the session & set the
-		//	data where it's supposed to be.
-		if($path === '/' || count($myIndexList) == 0) {
-			//setting the data.
-			$this->data = $data;
-			$retval = 1;
+		if(is_object($data)) {
+			throw new InvalidArgumentException("objects are not supported");
 		}
-		elseif(count($myIndexList) == 1) {
-			//that should be simple: set the index to be $data.
-			$this->data[$myIndexList[0]] = $data;
-			$retval = 1;
-		}
-		elseif(count($myIndexList) > 1) {
-			$this->internal_iterator($this->data, $path, $data);
-			$retval = 1;
+		else {
+			//get the list of indices in the session that we have to traverse.
+			$myIndexList = $this->explode_path($path);
+
+			$retval = 0;
+			//Use an internal iterator to go through the little bits of the session & set the
+			//	data where it's supposed to be.
+			if($path === '/' || count($myIndexList) == 0) {
+				//setting the data.
+				$this->data = $data;
+				$retval = 1;
+			}
+			elseif(count($myIndexList) == 1) {
+				//that should be simple: set the index to be $data.
+				if(!is_array($this->data)) {
+					$this->data = array();
+				}
+				$this->data[$myIndexList[0]] = $data;
+				$retval = 1;
+			}
+			elseif(count($myIndexList) > 1) {
+				$this->internal_iterator($this->data, $path, $data);
+				$retval = 1;
+			}
 		}
 		
 		return($retval);
@@ -254,45 +216,39 @@ class ArrayToPath {
 		$indexList = $this->explode_path($path);
 		$myIndex = array_shift($indexList);
 		$path = $this->string_from_array($indexList);
+		
+		
+		if(is_array($array)) {
+			if(!strlen($path)) {
+				if(isset($myIndex)) {
+					// setting the final piece of the array.
+					$array[$myIndex] = $data;
+				}
+				else {
+					throw new Exception(__METHOD__ .": no index ($myIndex) to follow at the end of the path");
+				}
+			}
+			else {
+				if((count($indexList) == 0) || (is_array($indexList) && count($indexList) > 0)) {
+					if(!isset($array[$myIndex]) || !is_array($array[$myIndex])) {
+						$array[$myIndex] = array(); 
+					}
+					$array = &$array[$myIndex];
 
-		if(is_array($array) && !strlen($path)) {
-			if(isset($myIndex)) {
-				//set the final piece of the array.
-				$array[$myIndex] = $data;
-			}
-			else {
-				//something is broken.
-				throw new exception(__METHOD__ .": no index ($myIndex) to follow at the end of the path.");
-			}
-		}
-		elseif(is_array($array) && strlen($path)) {
-			if((count($indexList) == 0) || (is_array($indexList) && count($indexList) > 1)) {
-				if(!isset($array[$myIndex]) || !is_array($array[$myIndex])) {
-					$array[$myIndex] = array(); 
+					$newPath = $path;
+					if(count($indexList) == 1) {
+						$newPath = $indexList[0];
+					}
+
+					$this->internal_iterator($array, $newPath, $data);
 				}
-				$array = &$array[$myIndex];
-				$newPath = $this->string_from_array($indexList);
-				
-				$this->internal_iterator($array, $path, $data);
-			}
-			elseif(is_array($indexList) && count($indexList) == 1) {
-				if(!isset($array[$myIndex]) || !is_array($array[$myIndex])) {
-					$array[$myIndex] = array();
+				else {
+					//not sure what to do but throw an exception.
+					throw new exception(__METHOD__ .": unknown error ('not sure what to do'): ($array)");
 				}
-				$array = &$array[$myIndex];
-				$this->internal_iterator($array, $indexList[0], $data);
 			}
-			else {
-				//not sure what to do but throw an exception.
-				throw new exception(__METHOD__ .": unknown error ('not sure what to do'): ($array)");
-			}
-		}
-		elseif(is_object($array)) {
-			//can't handle objects...?
-			throw new exception(__METHOD__ .": can't handle objects...?");
 		}
 		else {
-			//something is... er... broken.
 			throw new exception(__METHOD__ .": found unknown data type in path ($array)");
 		}
 		
@@ -446,14 +402,7 @@ class ArrayToPath {
 	
 	//======================================================================================
 	public function get_valid_paths() {
-		try {
-			$this->path_tracer();
-			unset($this->pathHandler);
-		}
-		catch(exception $e) {
-			throw new exception(__METHOD__ .": a fatal error occurred while tracing paths: ". $e->getMessage());
-		}
-		
+		$this->path_tracer();
 		return($this->validPaths);
 	}//end get_valid_paths()
 	//======================================================================================
